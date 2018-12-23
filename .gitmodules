@@ -1,0 +1,3 @@
+[submodule "src/jumpbox-deployment"]
+	path = src/jumpbox-deployment
+	url = https://github.com/cloudfoundry/jumpbox-deployment
