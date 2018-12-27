@@ -7,14 +7,42 @@
       script: |-
           #!/bin/bash
           chmod 1777 /tmp # https://github.com/cloudfoundry/bosh-linux-stemcell-builder/issues/39
+          jumpbox_home=/var/vcap/store/home/jumpbox
           apt-get -qq update
           apt -yqq install python
           dropbox_cli=/usr/local/bin/dropbox.py
           [ ! -f $dropbox_cli ] && wget -O $dropbox_cli "https://www.dropbox.com/download?dl=packages/dropbox.py"
           chmod +x $dropbox_cli
-          dropbox_up_script=/var/vcap/store/home/jumpbox/ubuntu_dropbox_up.sh
+
+          # https://linoxide.com/linux-how-to/install-dropbox-ubuntu/
+          cat <<EOF >/etc/systemd/system/dropbox.service
+          [Unit]
+          Description=Dropbox Service
+          After=network.target
+
+          [Service]
+          ExecStart=/bin/sh -c '/usr/local/bin/dropbox.py start'
+          ExecStop=/bin/sh -c '/usr/local/bin/dropbox.py stop'
+          PIDFile=${jumpbox_home}/.dropbox/dropbox.pid
+          User=jumpbox
+          Group=jumpbox
+          Type=forking
+          Restart=on-failure
+          RestartSec=5
+          StartLimitInterval=60s
+          StartLimitBurst=3
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          systemctl daemon-reload
+          systemctl enable dropbox
+          dropbox_up_script=${jumpbox_home}/ubuntu_dropbox_up.sh
           if [ ! -f $dropbox_up_script ]; then
             wget -O $dropbox_up_script https://gist.githubusercontent.com/matthewcosgrove/7a98cc996f8d7e421dd392c8d736b5eb/raw/5faa17863b61e75214c73fca0047360936b36441/ubuntu_dropbox_up.sh
             chmod +x $dropbox_up_script
             chown jumpbox:jumpbox $dropbox_up_script
+          else
+            systemctl start dropbox
           fi
