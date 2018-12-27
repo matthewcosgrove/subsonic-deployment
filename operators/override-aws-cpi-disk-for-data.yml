@@ -1,0 +1,8 @@
+- path: /resource_pools/name=vms/cloud_properties?
+  type: replace
+  value:
+    availability_zone: ((az))
+    ephemeral_disk:
+      size: 1000
+      type: gp2
+    instance_type: t2.micro
