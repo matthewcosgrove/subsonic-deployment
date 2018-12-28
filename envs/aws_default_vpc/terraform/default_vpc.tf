@@ -34,6 +34,13 @@ resource "aws_default_security_group" "default" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+  # Allow subsonic default port traffic
+  ingress {
+    from_port   = 4040
+    to_port     = 4040
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
   # Allow HTTPS traffic
   ingress {
     from_port   = 443

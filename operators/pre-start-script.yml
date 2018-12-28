@@ -46,3 +46,14 @@
           else
             systemctl start dropbox
           fi
+
+          # https://www.linuxbabe.com/ubuntu/install-subsonic-media-server-ubuntu-18-04-https
+          apt -yqq install openjdk-8-jre
+          subsonic_version=6.1.5
+          wget -O subsonic.deb https://s3-eu-west-1.amazonaws.com/subsonic-public/download/subsonic-${subsonic_version}.deb
+          dpkg -i subsonic.deb
+          # change default root user, and do so idempotently
+          sed -i '/SUBSONIC_USER/ s/=.*$/=jumpbox/' /etc/default/subsonic
+          # as values contain / use different sed delimeter #
+          sed -i '/SUBSONIC_ARGS/ s#=.*$#="--max-memory=150 --default-music-folder=/var/vcap/store/home/jumpbox/Dropbox/CapoeiraSubsonicLibrary/Capoeira --default-podcast-folder=/var/vcap/store/home/jumpbox/Dropbox/CapoeiraSubsonicLibrary/podcasts --default-playlist-folder=/var/vcap/store/home/jumpbox/Dropbox/CapoeiraSubsonicLibrary/playlists"#' /etc/default/subsonic
+          systemctl restart subsonic
