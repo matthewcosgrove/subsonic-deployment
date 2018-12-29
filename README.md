@@ -49,12 +49,23 @@ envs/aws_default_vpc/create-env.sh
 
 The VM should now be available, with Subsonic running. We will now need to ssh onto the VM to set up dropbox with the login process etc
 
+Login should happen automatically by running
+
 ```plain
 envs/aws_default_vpc/jumpbox-ssh.sh
-# you should now be in the ~ dir of the jumpbox which is actually /var/vcap/store/home/jumpbox. NOTE: Run `ssh-keygen -R <elastic-ip>` after any VM destroys to clean up the known_hosts file.
+```
+
+You should now be in the ~ dir of the jumpbox which is actually /var/vcap/store/home/jumpbox. NOTE: Run `ssh-keygen -R <elastic-ip>` after any VM destroys to clean up the known_hosts file.
+
+Next we will need to get dropbox set up and authenticate. Follow the output carefully from the following script in the jumpbox home directory
+
+IMPORTANT: The dropbox-cli is a bit naff and there is no simple way to avoid Dropbox trying to sync everything on start up. Double check the exclusions are set up as expected to avoid any nonsense.
+
+```plain
 ./ubuntu_dropbox_up.sh
 ```
 
+Again, read the output carefully, to ensure all the exclusions are in place.
 
 ### Teardown
 
