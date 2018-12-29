@@ -77,3 +77,22 @@
           printf "[Service]\nExecStartPost=/bin/sleep 0.1\n" > /etc/systemd/system/nginx.service.d/override.conf
           systemctl daemon-reload
           systemctl restart nginx
+          # check with 'netstat -plunt | grep nginx'
+
+          subsonic_server_domain="((subsonic_domain))"
+          # 'EOF' vs EOF with escaping --> https://stackoverflow.com/a/25903579/752167 and https://unix.stackexchange.com/a/405254/308152
+          cat <<EOF >/etc/nginx/conf.d/subsonic-proxy.conf
+          server {
+                  listen 80;
+                  server_name $subsonic_server_domain;
+
+                  location / {
+                          proxy_pass http://127.0.0.1:4040;
+                          proxy_set_header Host \$http_host;
+                          proxy_set_header X-Real-IP \$remote_addr;
+                          proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                          proxy_set_header X-Forwarded-Proto \$scheme;
+                  }
+          }
+          EOF
+          systemctl reload nginx

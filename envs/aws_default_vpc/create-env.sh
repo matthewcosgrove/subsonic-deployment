@@ -8,6 +8,7 @@ set -eu
 : "${AWS_KEYPAIR_NAME:? AWS_KEYPAIR_NAME must be set }"
 : "${SUBSONIC_SOLO_DROPBOX_FOLDER:? SUBSONIC_SOLO_DROPBOX_FOLDER must be set and defines the main top folder relative to ~/Dropbox which the headless dropbox cli exclusions algorithm will ignore i.e it will be left as the solo folder to be synced with dropbox on the ubuntu VM e.g. SubsonicLibrary }"
 : "${SUBSONIC_MUSIC_SUBFOLDER:? SUBSONIC_MUSIC_SUBFOLDER must be set and is the folder under ~/Dropbox/SUBSONIC_SOLO_DROPBOX_FOLDER which contains the music files which will appear by default in subsonic e.g. MyMusic i.e. in your path this would end up as ~/Dropbox/SubsonicLibrary/MyMusic }"
+: "${SUBSONIC_DOMAIN:? SUBSONIC_DOMAIN must be set to the DNS being used to refer to this instance which should be configured in nginx e.g. music.mydomain.com }"
 
 set +u
 [ ! -z "$1" ] && STATE_DIR=state-$1
@@ -60,6 +61,7 @@ bosh create-env $REPO_ROOT_DIR/src/jumpbox-deployment/jumpbox.yml \
   -v default_security_groups=[$default_security_group] \
   -v subsonic_solo_dropbox_folder=$SUBSONIC_SOLO_DROPBOX_FOLDER \
   -v subsonic_music_subfolder=$SUBSONIC_MUSIC_SUBFOLDER \
+  -v subsonic_domain=$SUBSONIC_DOMAIN \
   --var-file private_key=$AWS_PRIVATE_KEY_LOCATION
 if [ ! -f $SCRIPT_DIR_STATE_DERIVED_CONFIG ];then
 cat <<EOF >$SCRIPT_DIR_STATE_DERIVED_CONFIG
