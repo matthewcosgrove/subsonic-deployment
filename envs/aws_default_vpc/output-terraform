@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -eu
+: "${TERRAFORM_STATE:? TERRAFORM_STATE must be set }"
+
+export elastic_ip=$(terraform output -state=$TERRAFORM_STATE elastic_ip)
+export az=$(terraform output -state=$TERRAFORM_STATE default_subnet_az)
+export default_security_group=$(terraform output -state=$TERRAFORM_STATE default_security_group)
+export subnet_id=$(terraform output -state=$TERRAFORM_STATE default_subnet_id)
+export subnet_cidr=$(terraform output -state=$TERRAFORM_STATE default_subnet_cidr)
+

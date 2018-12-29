@@ -7,19 +7,20 @@ set -eu
 : "${AWS_PRIVATE_KEY_LOCATION:? AWS_PRIVATE_KEY_LOCATION must be set }"
 : "${AWS_KEYPAIR_NAME:? AWS_KEYPAIR_NAME must be set }"
 
+set +u
+[ ! -z "$1" ] && STATE_DIR=state-$1
+set -u
 REPO_ROOT_DIR="$(dirname $(dirname $( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )))"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-SCRIPT_DIR_STATE=$SCRIPT_DIR/state
-mkdir -p $SCRIPT_DIR_STATE
+SCRIPT_DIR_STATE="$SCRIPT_DIR/${STATE_DIR:=state}"
 
+export TERRAFORM_STATE="$SCRIPT_DIR_STATE/terraform.tfstate"
 pushd $SCRIPT_DIR/terraform > /dev/null
-elastic_ip=$(terraform output elastic_ip)
-az=$(terraform output default_subnet_az)
-default_security_group=$(terraform output default_security_group)
-subnet_id=$(terraform output default_subnet_id)
-subnet_cidr=$(terraform output default_subnet_cidr)
-subnet_gw=$(awk -F"." '{print $1"."$2"."$3".1"}'<<<$subnet_cidr)
-subnet_new_ip=$(awk -F"." '{print $1"."$2"."$3".10"}'<<<$subnet_cidr)
+source $SCRIPT_DIR/output-terraform
+SCRIPT_DIR_STATE_DERIVED_CONFIG="$SCRIPT_DIR_STATE/derived-config"
+source $SCRIPT_DIR_STATE_DERIVED_CONFIG
+subnet_gw=$AWS_SUBNET_GW
+subnet_new_ip=$AWS_SUBNET_VM_INTERNAL_IP
 bosh delete-env $REPO_ROOT_DIR/src/jumpbox-deployment/jumpbox.yml \
   --state $SCRIPT_DIR_STATE/state.json \
   -o $REPO_ROOT_DIR/src/jumpbox-deployment/aws/cpi.yml \
@@ -38,5 +39,7 @@ bosh delete-env $REPO_ROOT_DIR/src/jumpbox-deployment/jumpbox.yml \
   -v external_ip=$elastic_ip \
   -v default_security_groups=[$default_security_group] \
   --var-file private_key=$AWS_PRIVATE_KEY_LOCATION
-terraform destroy -input=false -auto-approve
+terraform destroy -input=false -auto-approve -state=$TERRAFORM_STATE
+rm $SCRIPT_DIR_STATE_DERIVED_CONFIG
+rm $SCRIPT_DIR_STATE/creds.yml
 popd > /dev/null

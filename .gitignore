@@ -2,5 +2,5 @@
 *.tfplan
 *.tfstate*
 .terraform
-ssh/
 state/
+state-*/

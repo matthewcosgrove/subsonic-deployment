@@ -2,20 +2,18 @@
 
 set -eu
 
+TMPDIR=""¬
+TMPDIR=$(mktemp -d -t jumpbox_ssh.XXXXXX)
+trap "rm -rf ${TMPDIR}" INT TERM QUIT EXIT
 
+set +u
+[ ! -z "$1" ] && STATE_DIR=state-$1
+set -u
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-source $SCRIPT_DIR/state/elastic-ip
-: "${AWS_ELASTIC_IP:? AWS_ELASTIC_IP must be set }"
-KEYHOLDER_DIR=$SCRIPT_DIR/ssh
-mkdir -p $KEYHOLDER_DIR
-chmod 700 $KEYHOLDER_DIR
-
-bosh int $SCRIPT_DIR/state/creds.yml --path /jumpbox_ssh/private_key > $KEYHOLDER_DIR/jumpbox.pem
-chmod 600 $KEYHOLDER_DIR/jumpbox.pem
-
-#jumpbox_ip=$(terraform output --state=envs/aws/terraform.tfstate box.jumpbox.public_ip)
-jumpbox_ip=$AWS_ELASTIC_IP
-
-ssh -A jumpbox@${jumpbox_ip} \
-  -i $KEYHOLDER_DIR/jumpbox.pem \
-  "$@"
+SCRIPT_DIR_STATE="$SCRIPT_DIR/${STATE_DIR:=state}"
+echo "Using state stored in $SCRIPT_DIR_STATE"
+export TERRAFORM_STATE="$SCRIPT_DIR_STATE/terraform.tfstate"
+source $SCRIPT_DIR/output-terraform
+bosh int $SCRIPT_DIR_STATE/creds.yml --path /jumpbox_ssh/private_key > $TMPDIR/jumpbox.pem && chmod 600 $TMPDIR/jumpbox.pem
+ssh -A jumpbox@${elastic_ip} \
+  -i $TMPDIR/jumpbox.pem

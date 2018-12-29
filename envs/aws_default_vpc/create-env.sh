@@ -7,22 +7,37 @@ set -eu
 : "${AWS_PRIVATE_KEY_LOCATION:? AWS_PRIVATE_KEY_LOCATION must be set }"
 : "${AWS_KEYPAIR_NAME:? AWS_KEYPAIR_NAME must be set }"
 
+set +u
+[ ! -z "$1" ] && STATE_DIR=state-$1
+set -u
 REPO_ROOT_DIR="$(dirname $(dirname $( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )))"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-SCRIPT_DIR_STATE=$SCRIPT_DIR/state
+SCRIPT_DIR_STATE="$SCRIPT_DIR/${STATE_DIR:=state}"
+echo "State will be stored in $SCRIPT_DIR_STATE"
 mkdir -p $SCRIPT_DIR_STATE
 
+export TERRAFORM_STATE="$SCRIPT_DIR_STATE/terraform.tfstate"
+echo "Terraform state will be stored in $TERRAFORM_STATE"
 pushd $SCRIPT_DIR/terraform > /dev/null
-terraform init
-terraform apply -input=false -auto-approve
+terraform init 
+terraform apply -input=false -auto-approve -state=$TERRAFORM_STATE
 
-elastic_ip=$(terraform output elastic_ip)
-az=$(terraform output default_subnet_az)
-default_security_group=$(terraform output default_security_group)
-subnet_id=$(terraform output default_subnet_id)
-subnet_cidr=$(terraform output default_subnet_cidr)
-subnet_gw=$(awk -F"." '{print $1"."$2"."$3".1"}'<<<$subnet_cidr)
-subnet_new_ip=$(awk -F"." '{print $1"."$2"."$3".10"}'<<<$subnet_cidr)
+source $SCRIPT_DIR/output-terraform
+SCRIPT_DIR_STATE_DERIVED_CONFIG="$SCRIPT_DIR_STATE/derived-config"
+if [ -f $SCRIPT_DIR_STATE_DERIVED_CONFIG ];then
+  source $SCRIPT_DIR_STATE_DERIVED_CONFIG
+  subnet_gw=$AWS_SUBNET_GW
+  subnet_new_ip=$AWS_SUBNET_VM_INTERNAL_IP
+else
+  set +u
+  [ ! -z "$1" ] && AWS_PRIVATE_IP_FOURTH_OCTET=${AWS_PRIVATE_IP_FOURTH_OCTET:-11}
+  set -u
+  AWS_PRIVATE_IP_FOURTH_OCTET=${AWS_PRIVATE_IP_FOURTH_OCTET:-10}
+  echo "VM's Private IP 4th octet will be $AWS_PRIVATE_IP_FOURTH_OCTET, to change it you can pass it in e.g. AWS_PRIVATE_IP_FOURTH_OCTET=12 $0"
+  subnet_gw=$(awk -F"." '{print $1"."$2"."$3".1"}'<<<$subnet_cidr)
+  subnet_new_ip=$(awk -F"." '{print $1"."$2"."$3"."}'<<<$subnet_cidr)$AWS_PRIVATE_IP_FOURTH_OCTET
+fi
+echo "VM will be created with private IP $subnet_new_ip and public IP $elastic_ip"
 bosh create-env $REPO_ROOT_DIR/src/jumpbox-deployment/jumpbox.yml \
   --state $SCRIPT_DIR_STATE/state.json \
   -o $REPO_ROOT_DIR/src/jumpbox-deployment/aws/cpi.yml \
@@ -42,5 +57,14 @@ bosh create-env $REPO_ROOT_DIR/src/jumpbox-deployment/jumpbox.yml \
   -v external_ip=$elastic_ip \
   -v default_security_groups=[$default_security_group] \
   --var-file private_key=$AWS_PRIVATE_KEY_LOCATION
-echo "AWS_ELASTIC_IP=$elastic_ip" > $SCRIPT_DIR/state/elastic-ip
+if [ ! -f $SCRIPT_DIR_STATE_DERIVED_CONFIG ];then
+cat <<EOF >$SCRIPT_DIR_STATE_DERIVED_CONFIG
+AWS_SUBNET_GW=$subnet_gw
+AWS_SUBNET_VM_INTERNAL_IP=$subnet_new_ip
+EOF
+  echo "Derived config written to $SCRIPT_DIR_STATE_DERIVED_CONFIG"
+  cat $SCRIPT_DIR_STATE_DERIVED_CONFIG
+else
+  echo "Derived config already exists: $SCRIPT_DIR_STATE_DERIVED_CONFIG"
+fi
 popd > /dev/null
