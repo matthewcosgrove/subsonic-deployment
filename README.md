@@ -4,7 +4,7 @@ A quick way to fire up an instance of Subsonic on AWS backed by Dropbox for easy
 
 ## Prerequisites
 
-You should know how to set up env vars, and ensure all the env vars mentioned in capitals below have been exported.
+You should know how to set up env vars, and ensure all the env vars mentioned in capitals below have been exported. See the main list at the top of [create-env.sh](envs/aws_default_vpc/create-env.sh)
 
 ### Subsonic Domain
 
