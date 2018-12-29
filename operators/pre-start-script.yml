@@ -55,5 +55,12 @@
           # change default root user, and do so idempotently
           sed -i '/SUBSONIC_USER/ s/=.*$/=jumpbox/' /etc/default/subsonic
           # as values contain / use different sed delimeter #
-          sed -i '/SUBSONIC_ARGS/ s#=.*$#="--max-memory=150 --default-music-folder=/var/vcap/store/home/jumpbox/Dropbox/CapoeiraSubsonicLibrary/Capoeira --default-podcast-folder=/var/vcap/store/home/jumpbox/Dropbox/CapoeiraSubsonicLibrary/podcasts --default-playlist-folder=/var/vcap/store/home/jumpbox/Dropbox/CapoeiraSubsonicLibrary/playlists"#' /etc/default/subsonic
+          solo_dropbox_folder=Dropbox/"((subsonic_solo_dropbox_folder))"
+          subsonic_music_dir="((subsonic_music_subfolder))"
+          subsonic_podcasts_dir="podcasts"
+          subsonic_playlists_dir="playlists"
+          subsonic_music_home="${jumpbox_home}/${solo_dropbox_folder}/${subsonic_music_dir}"
+          subsonic_podcasts_home="${jumpbox_home}/${solo_dropbox_folder}/${subsonic_podcasts_dir}"
+          subsonic_playlists_home="${jumpbox_home}/${solo_dropbox_folder}/${subsonic_playlists_dir}"
+          sed -i '/SUBSONIC_ARGS/ s#=.*$#="--max-memory=150 --default-music-folder='"${subsonic_music_home}"' --default-podcast-folder='"${subsonic_podcasts_home}"' --default-playlist-folder='"${subsonic_playlists_home}"'"#' /etc/default/subsonic
           systemctl restart subsonic
