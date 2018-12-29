@@ -64,3 +64,16 @@
           subsonic_playlists_home="${jumpbox_home}/${solo_dropbox_folder}/${subsonic_playlists_dir}"
           sed -i '/SUBSONIC_ARGS/ s#=.*$#="--max-memory=150 --default-music-folder='"${subsonic_music_home}"' --default-podcast-folder='"${subsonic_podcasts_home}"' --default-playlist-folder='"${subsonic_playlists_home}"'"#' /etc/default/subsonic
           systemctl restart subsonic
+
+          # Either enable IPv6 or change the nginx configuration issue --> https://serverfault.com/a/828014
+          # Means we know the nginx install will fail so install and swallow failure
+          apt -yqq install nginx || true # https://stackoverflow.com/a/11231970/752167
+          sed -i '/:80 /s/^/#/' /etc/nginx/sites-enabled/default
+          systemctl restart nginx || true
+          systemctl start nginx || true
+          # ubuntu 16.04 bug --> https://bugs.launchpad.net/ubuntu/+source/nginx/+bug/1581864
+          # also see https://stackoverflow.com/a/42084804/752167
+          mkdir /etc/systemd/system/nginx.service.d
+          printf "[Service]\nExecStartPost=/bin/sleep 0.1\n" > /etc/systemd/system/nginx.service.d/override.conf
+          systemctl daemon-reload
+          systemctl restart nginx
