@@ -30,6 +30,8 @@ bosh delete-env $REPO_ROOT_DIR/src/jumpbox-deployment/jumpbox.yml \
   -o $REPO_ROOT_DIR/src/jumpbox-deployment/aws/cpi.yml \
   -o $REPO_ROOT_DIR/operators/pre-start-script.yml \
   -o $REPO_ROOT_DIR/operators/persistent-homes.yml \
+  -o $REPO_ROOT_DIR/operators/override-aws-cpi-disk-for-data.yml \
+  -o $REPO_ROOT_DIR/operators/replace-name-jumpbox-with-subsonic.yml \
   --vars-store $SCRIPT_DIR_STATE/creds.yml \
   -v access_key_id=$AWS_ACCESS_KEY_ID \
   -v secret_access_key=$AWS_SECRET_ACCESS_KEY \

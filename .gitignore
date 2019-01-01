@@ -4,3 +4,4 @@
 .terraform
 state/
 state-*/
+tmp*
