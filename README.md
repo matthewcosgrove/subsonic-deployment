@@ -87,3 +87,24 @@ to teardown the environment
 DANGER-ZONE
 envs/aws_default_vpc/destroy-env.sh
 ```
+
+### RDS Postgres (Optional)
+
+If you don't want the default in-memory DB then Postgres can be configured as follows
+
+* Login to the AWS console for RDS and create a new DB named "subsonic" (use Dev/Test option to keep it in the free tier and then also select any checkboxes that say "Only enable options eligible for RDS Free Usage Tier")), take note of the host from the Connectivity tab Endpoint field (it should end in rds.amazonaws.com).
+* You should use the Default subnet. Hopefully, this should correspond to the Default VPC the scripts have used.
+* You wont need to set "Public accessibility" to Yes unless you want to manage the DB directly from your machine which would need external access.
+* Grab the VPC default security group id and add it to the newly created DB security group on the inbound rules for port 5432
+* Populate the env vars SUBSONIC_POSTGRES_DB_HOST, SUBSONIC_POSTGRES_DB_USERNAME and SUBSONIC_POSTGRES_DB_PASSWORD before running ./create-env.sh (these will be used to derive the JDBC driver url `jdbc:postgresql://$SUBSONIC_POSTGRES_DB_HOST:5432/subsonic?user=$SUBSONIC_POSTGRES_DB_USERNAME&password=$SUBSONIC_POSTGRES_DB_PASSWORD`)
+
+### Appendix - Install Tools
+
+#### Debian/Ubuntu
+
+```plain
+wget -q -O - https://raw.githubusercontent.com/starkandwayne/homebrew-cf/master/public.key | apt-key add -
+echo "deb http://apt.starkandwayne.com stable main" | tee /etc/apt/sources.list.d/starkandwayne.list
+apt-get update
+apt-get install bosh-cli terraform
+```

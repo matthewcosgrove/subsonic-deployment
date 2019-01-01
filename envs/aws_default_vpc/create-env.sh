@@ -41,6 +41,29 @@ else
   subnet_new_ip=$(awk -F"." '{print $1"."$2"."$3"."}'<<<$subnet_cidr)$AWS_PRIVATE_IP_FOURTH_OCTET
 fi
 echo "VM will be created with private IP $subnet_new_ip and public IP $elastic_ip"
+jumpbox_home="/var/vcap/store/home/jumpbox"
+solo_dropbox_folder=Dropbox/"$SUBSONIC_SOLO_DROPBOX_FOLDER"
+subsonic_music_dir=$SUBSONIC_MUSIC_SUBFOLDER
+subsonic_podcasts_dir="podcasts"
+subsonic_playlists_dir="playlists"
+subsonic_music_home="${jumpbox_home}/${solo_dropbox_folder}/${subsonic_music_dir}"
+subsonic_podcasts_home="${jumpbox_home}/${solo_dropbox_folder}/${subsonic_podcasts_dir}"
+subsonic_playlists_home="${jumpbox_home}/${solo_dropbox_folder}/${subsonic_playlists_dir}"
+subsonic_args="--max-memory=150 --default-music-folder=${subsonic_music_home} --default-podcast-folder=${subsonic_podcasts_home} --default-playlist-folder=${subsonic_playlists_home}"
+set +u
+if [[ -z $SUBSONIC_POSTGRES_DB_HOST || -z $SUBSONIC_POSTGRES_DB_USERNAME || -z $SUBSONIC_POSTGRES_DB_PASSWORD ]]; then
+  subsonic_args_suffix=""
+else
+  subsonic_args_suffix=" --db=jdbc:postgresql://$SUBSONIC_POSTGRES_DB_HOST:5432/subsonic?user=$SUBSONIC_POSTGRES_DB_USERNAME&password=$SUBSONIC_POSTGRES_DB_PASSWORD"
+fi
+set -u
+subsonic_args=$subsonic_args$subsonic_args_suffix
+TMPDIR=""¬
+TMPDIR=$(mktemp -d -t subsonic-args.XXXXXX)
+trap "rm -rf ${TMPDIR}" INT TERM QUIT EXIT
+cat <<EOF > ${TMPDIR}/subsonic-args.yml
+subsonic_args: "$subsonic_args"
+EOF
 bosh create-env $REPO_ROOT_DIR/src/jumpbox-deployment/jumpbox.yml \
   --state $SCRIPT_DIR_STATE/state.json \
   -o $REPO_ROOT_DIR/operators/remove-custom-dns-setting.yml \
@@ -61,9 +84,9 @@ bosh create-env $REPO_ROOT_DIR/src/jumpbox-deployment/jumpbox.yml \
   -v internal_ip=$subnet_new_ip \
   -v external_ip=$elastic_ip \
   -v default_security_groups=[$default_security_group] \
-  -v subsonic_solo_dropbox_folder=$SUBSONIC_SOLO_DROPBOX_FOLDER \
-  -v subsonic_music_subfolder=$SUBSONIC_MUSIC_SUBFOLDER \
   -v subsonic_domain=$SUBSONIC_DOMAIN \
+  -v jumpbox_home=$jumpbox_home \
+  -l ${TMPDIR}/subsonic-args.yml \
   --var-file private_key=$AWS_PRIVATE_KEY_LOCATION
 if [ ! -f $SCRIPT_DIR_STATE_DERIVED_CONFIG ];then
 cat <<EOF >$SCRIPT_DIR_STATE_DERIVED_CONFIG

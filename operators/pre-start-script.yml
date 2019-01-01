@@ -7,7 +7,14 @@
       script: |-
           #!/bin/bash
           chmod 1777 /tmp # https://github.com/cloudfoundry/bosh-linux-stemcell-builder/issues/39
-          jumpbox_home=/var/vcap/store/home/jumpbox
+          # bosh cli injected args
+          UBUNTU_USER_HOME_DIR="((jumpbox_home))"
+          SUBSONIC_SERVER_DOMAIN="((subsonic_domain))"
+          SUBSONIC_JVM_START_UP_ARGS='((subsonic_args))'
+          # start ubuntu script - agnostic of bosh cli usage
+          : "${UBUNTU_USER_HOME_DIR:? UBUNTU_USER_HOME_DIR must be set}"
+          : "${SUBSONIC_SERVER_DOMAIN:? SUBSONIC_SERVER_DOMAIN must be set to the DNS being used to refer to this instance which should be configured in nginx e.g. music.mydomain.com }"
+          : "${SUBSONIC_JVM_START_UP_ARGS:? SUBSONIC_JVM_START_UP_ARGS must be set to override the defaults in /etc/default/subsonic}"
           apt-get -qq update
           apt -yqq install python
           dropbox_cli=/usr/local/bin/dropbox.py
@@ -23,7 +30,7 @@
           [Service]
           ExecStart=/bin/sh -c '/usr/local/bin/dropbox.py start'
           ExecStop=/bin/sh -c '/usr/local/bin/dropbox.py stop'
-          PIDFile=${jumpbox_home}/.dropbox/dropbox.pid
+          PIDFile=${UBUNTU_USER_HOME_DIR}/.dropbox/dropbox.pid
           User=jumpbox
           Group=jumpbox
           Type=forking
@@ -38,7 +45,7 @@
 
           systemctl daemon-reload
           systemctl enable dropbox
-          dropbox_up_script=${jumpbox_home}/ubuntu_dropbox_up.sh
+          dropbox_up_script=${UBUNTU_USER_HOME_DIR}/ubuntu_dropbox_up.sh
           if [ ! -f $dropbox_up_script ]; then
             wget -O $dropbox_up_script https://gist.githubusercontent.com/matthewcosgrove/7a98cc996f8d7e421dd392c8d736b5eb/raw/5faa17863b61e75214c73fca0047360936b36441/ubuntu_dropbox_up.sh
             chmod +x $dropbox_up_script
@@ -54,15 +61,9 @@
           dpkg -i subsonic.deb
           # change default root user, and do so idempotently
           sed -i '/SUBSONIC_USER/ s/=.*$/=jumpbox/' /etc/default/subsonic
+          subsonic_jvm_start_up_args_with_ampersand_escaped_for_sed=${SUBSONIC_JVM_START_UP_ARGS//&/\\&} # https://stackoverflow.com/a/44375021/752167
           # as values contain / use different sed delimeter #
-          solo_dropbox_folder=Dropbox/"((subsonic_solo_dropbox_folder))"
-          subsonic_music_dir="((subsonic_music_subfolder))"
-          subsonic_podcasts_dir="podcasts"
-          subsonic_playlists_dir="playlists"
-          subsonic_music_home="${jumpbox_home}/${solo_dropbox_folder}/${subsonic_music_dir}"
-          subsonic_podcasts_home="${jumpbox_home}/${solo_dropbox_folder}/${subsonic_podcasts_dir}"
-          subsonic_playlists_home="${jumpbox_home}/${solo_dropbox_folder}/${subsonic_playlists_dir}"
-          sed -i '/SUBSONIC_ARGS/ s#=.*$#="--max-memory=150 --default-music-folder='"${subsonic_music_home}"' --default-podcast-folder='"${subsonic_podcasts_home}"' --default-playlist-folder='"${subsonic_playlists_home}"'"#' /etc/default/subsonic
+          sed -i '/^SUBSONIC_ARGS/ s#=.*$#="'"$subsonic_jvm_start_up_args_with_ampersand_escaped_for_sed"'"#' /etc/default/subsonic
           systemctl restart subsonic
 
           # Either enable IPv6 or change the nginx configuration issue --> https://serverfault.com/a/828014
@@ -79,12 +80,11 @@
           systemctl restart nginx
           # check with 'netstat -plunt | grep nginx'
 
-          subsonic_server_domain="((subsonic_domain))"
           # 'EOF' vs EOF with escaping --> https://stackoverflow.com/a/25903579/752167 and https://unix.stackexchange.com/a/405254/308152
           cat <<EOF >/etc/nginx/conf.d/subsonic-proxy.conf
           server {
                   listen 80;
-                  server_name $subsonic_server_domain;
+                  server_name $SUBSONIC_SERVER_DOMAIN;
 
                   location / {
                           proxy_pass http://127.0.0.1:4040;
