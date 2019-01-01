@@ -1,0 +1,6 @@
+- type: replace
+  path: /networks/name=private/subnets
+  value:
+  - range: ((internal_cidr))
+    gateway: ((internal_gw))
+    static: [((internal_ip))]

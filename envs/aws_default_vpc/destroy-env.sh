@@ -26,6 +26,7 @@ subnet_gw=$AWS_SUBNET_GW
 subnet_new_ip=$AWS_SUBNET_VM_INTERNAL_IP
 bosh delete-env $REPO_ROOT_DIR/src/jumpbox-deployment/jumpbox.yml \
   --state $SCRIPT_DIR_STATE/state.json \
+  -o $REPO_ROOT_DIR/operators/remove-custom-dns-setting.yml \
   -o $REPO_ROOT_DIR/src/jumpbox-deployment/aws/cpi.yml \
   -o $REPO_ROOT_DIR/operators/pre-start-script.yml \
   -o $REPO_ROOT_DIR/operators/persistent-homes.yml \

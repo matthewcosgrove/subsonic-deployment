@@ -2,6 +2,10 @@
 
 A quick way to fire up an instance of Subsonic on AWS backed by Dropbox for easy syncing.
 
+WARNING: You should be familiar with AWS before running this set up, especially the pricing model. It is recommended to set up notifications on your billing account to trigger alerts when your bill runs above a certain threshold. Whilst this set up was tested and run on the AWS Free Tier without cost, a normal account would incur costs. Changing settings within this project will also affect the associated cost. A large music collection, for example, would require you to increase the default persistent disk size and therefore also increase the costs.
+
+IMPORTANT: It is recommended to use the destroy-env.sh script to teardown the environment. To use it requires retaining the state after running the creation script (explained further below). By taking this clean approach via the scripted set up and teardown, you won't leave unassociated Elastic IPs behind to incur costs which might happen if you manually delete the VM that gets created and forget to delete the Elastic IP.
+
 ## Prerequisites
 
 You should know how to set up env vars, and ensure all the env vars mentioned in capitals below have been exported. See the main list at the top of [create-env.sh](envs/aws_default_vpc/create-env.sh)
@@ -66,6 +70,14 @@ IMPORTANT: The dropbox-cli is a bit naff and there is no simple way to avoid Dro
 ```
 
 Again, read the output carefully, to ensure all the exclusions are in place.
+
+### Updates
+
+Any changes to the underlying config will generally cause the VM to get re-built when you re-run
+
+```plain
+envs/aws_default_vpc/create-env.sh
+```
 
 ### Teardown
 

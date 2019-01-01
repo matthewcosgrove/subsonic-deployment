@@ -43,6 +43,7 @@ fi
 echo "VM will be created with private IP $subnet_new_ip and public IP $elastic_ip"
 bosh create-env $REPO_ROOT_DIR/src/jumpbox-deployment/jumpbox.yml \
   --state $SCRIPT_DIR_STATE/state.json \
+  -o $REPO_ROOT_DIR/operators/remove-custom-dns-setting.yml \
   -o $REPO_ROOT_DIR/src/jumpbox-deployment/aws/cpi.yml \
   -o $REPO_ROOT_DIR/operators/pre-start-script.yml \
   -o $REPO_ROOT_DIR/operators/persistent-homes.yml \
