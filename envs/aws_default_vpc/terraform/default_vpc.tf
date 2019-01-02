@@ -34,10 +34,10 @@ resource "aws_default_security_group" "default" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  # Allow subsonic default port traffic
+  # Allow certbot to verify the first time, then http will always get redirected to https
   ingress {
-    from_port   = 4040
-    to_port     = 4040
+    from_port   = 80
+    to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }

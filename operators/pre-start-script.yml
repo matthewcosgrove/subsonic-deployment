@@ -6,11 +6,13 @@
     properties:
       script: |-
           #!/bin/bash
+          set -e
           chmod 1777 /tmp # https://github.com/cloudfoundry/bosh-linux-stemcell-builder/issues/39
           # bosh cli injected args
           UBUNTU_USER_HOME_DIR="((jumpbox_home))"
           SUBSONIC_SERVER_DOMAIN="((subsonic_domain))"
-          SUBSONIC_JVM_START_UP_ARGS='((subsonic_args))'
+          SUBSONIC_JVM_START_UP_ARGS="((subsonic_args))"
+          SUBSONIC_LETS_ENCRYPT_EMAIL="((subsonic_lets_encrypt_email))"
           # start ubuntu script - agnostic of bosh cli usage
           : "${UBUNTU_USER_HOME_DIR:? UBUNTU_USER_HOME_DIR must be set}"
           : "${SUBSONIC_SERVER_DOMAIN:? SUBSONIC_SERVER_DOMAIN must be set to the DNS being used to refer to this instance which should be configured in nginx e.g. music.mydomain.com }"
@@ -95,4 +97,13 @@
                   }
           }
           EOF
+          systemctl reload nginx
+          apt install -yqq software-properties-common
+          add-apt-repository -y ppa:certbot/certbot
+          apt update
+          apt install -yqq certbot python3-certbot-nginx
+          certbot -n --nginx --agree-tos --redirect --hsts --staple-ocsp --email $SUBSONIC_LETS_ENCRYPT_EMAIL --domain $SUBSONIC_SERVER_DOMAIN
+          # TODO: Run this as Timer Service so that it gets updated on every renew as well.. the certbot writes to this file, so should test if would get overwritten first
+          # Ensure that the settings page works etc. Full insight here https://sourceforge.net/p/subsonic/bugs/179/
+          sed -i '/proxy_set_header X-Forwarded-Proto/ a '"proxy_redirect http:// https://;"'' /etc/nginx/conf.d/subsonic-proxy.conf
           systemctl reload nginx
