@@ -63,6 +63,7 @@ bosh delete-env $REPO_ROOT_DIR/src/jumpbox-deployment/jumpbox.yml \
   -v subsonic_domain=$SUBSONIC_DOMAIN \
   -v jumpbox_home=$jumpbox_home \
   -v subsonic_lets_encrypt_email=$SUBSONIC_LETS_ENCRYPT_EMAIL \
+  -v subsonic_solo_dropbox_folder=$SUBSONIC_SOLO_DROPBOX_FOLDER \
   -l ${TMPDIR}/subsonic-args.yml \
   --var-file private_key=$AWS_PRIVATE_KEY_LOCATION
 terraform destroy -input=false -auto-approve -state=$TERRAFORM_STATE

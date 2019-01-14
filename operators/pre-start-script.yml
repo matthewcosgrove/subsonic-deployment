@@ -13,13 +13,37 @@
           SUBSONIC_SERVER_DOMAIN="((subsonic_domain))"
           SUBSONIC_JVM_START_UP_ARGS="((subsonic_args))"
           SUBSONIC_LETS_ENCRYPT_EMAIL="((subsonic_lets_encrypt_email))"
+          SUBSONIC_SOLO_DROPBOX_FOLDER="((subsonic_solo_dropbox_folder))"
           # start ubuntu script - agnostic of bosh cli usage
           : "${UBUNTU_USER_HOME_DIR:? UBUNTU_USER_HOME_DIR must be set}"
           : "${SUBSONIC_SERVER_DOMAIN:? SUBSONIC_SERVER_DOMAIN must be set to the DNS being used to refer to this instance which should be configured in nginx e.g. music.mydomain.com }"
           : "${SUBSONIC_JVM_START_UP_ARGS:? SUBSONIC_JVM_START_UP_ARGS must be set to override the defaults in /etc/default/subsonic}"
+          : "${SUBSONIC_SOLO_DROPBOX_FOLDER:? SUBSONIC_SOLO_DROPBOX_FOLDER must be set to the only folder which wont get excluded}"
           apt-get -qq update
           apt -yqq install python
           dropbox_cli=/usr/local/bin/dropbox.py
+          pushd $UBUNTU_USER_HOME_DIR
+          # install dropboxd
+          wget -O - "https://www.dropbox.com/download?plat=lnx.x86_64" | tar xzf -
+          chown -R jumpbox:jumpbox .dropbox-dist
+          # prepare dropbox start up script needed for interactive login
+          dropbox_up_script=ubuntu_dropbox_up.sh
+          cat <<EOF > $dropbox_up_script
+            #!/bin/bash
+            dropbox(){
+             /usr/local/bin/dropbox.py "\$@"
+            }
+            echo "IMPORTANT: You must now login.. then kill the script and continue as described here"
+            echo "WARNING: Starting dropbox in the next step will start downloading everything from your account, so ensure the service is running to selective sync i.e. systemctl status subsonic-dropbox-exclusions"
+            echo "After login start dropbox with the following command"
+            echo "dropbox start && dropbox lansync n"
+            dropbox status && ~/.dropbox-dist/dropboxd
+          EOF
+          chmod +x $dropbox_up_script
+          chown jumpbox:jumpbox $dropbox_up_script
+          # alias for dropbox cli
+          echo "alias dropbox=$dropbox_cli" > .bash_aliases
+          popd
           [ ! -f $dropbox_cli ] && wget -O $dropbox_cli "https://www.dropbox.com/download?dl=packages/dropbox.py"
           chmod +x $dropbox_cli
 
@@ -47,14 +71,6 @@
 
           systemctl daemon-reload
           systemctl enable dropbox
-          dropbox_up_script=${UBUNTU_USER_HOME_DIR}/ubuntu_dropbox_up.sh
-          if [ ! -f $dropbox_up_script ]; then
-            wget -O $dropbox_up_script https://gist.githubusercontent.com/matthewcosgrove/7a98cc996f8d7e421dd392c8d736b5eb/raw/5faa17863b61e75214c73fca0047360936b36441/ubuntu_dropbox_up.sh
-            chmod +x $dropbox_up_script
-            chown jumpbox:jumpbox $dropbox_up_script
-          else
-            systemctl start dropbox
-          fi
 
           # https://www.linuxbabe.com/ubuntu/install-subsonic-media-server-ubuntu-18-04-https
           apt -yqq install openjdk-8-jre
@@ -107,3 +123,58 @@
           # Ensure that the settings page works etc. Full insight here https://sourceforge.net/p/subsonic/bugs/179/
           sed -i '/proxy_set_header X-Forwarded-Proto/ a '"proxy_redirect http:// https://;"'' /etc/nginx/conf.d/subsonic-proxy.conf
           systemctl reload nginx
+
+          # dropbox exclusions service
+          DROPBOX_FOLDER_TO_KEEP=$SUBSONIC_SOLO_DROPBOX_FOLDER
+          dropbox_location=$UBUNTU_USER_HOME_DIR/Dropbox
+          cat <<EOF > /usr/bin/systemctl_dropbox_exclusions.sh
+          #!/bin/bash
+          [[ ! -d "$dropbox_location" ]] && { echo "FATAL - $dropbox_location does not exist"; exit 1; }
+
+          pushd $dropbox_location > /dev/null
+          # TODO: avoid ls ---> http://mywiki.wooledge.org/ParsingLs
+          dropbox(){
+           /usr/local/bin/dropbox.py "\$@"
+          }
+          while [ "\$(ls -1 | grep -v $DROPBOX_FOLDER_TO_KEEP | wc -l)" -ne "0" ]
+          do
+          item=\$(ls | grep -v "$DROPBOX_FOLDER_TO_KEEP" | head -1)
+          echo Excluding \$item
+          dropbox exclude add "\$item"
+          echo "'dropbox exclude add' completed for \$item"
+          done
+          popd > /dev/null
+          dropbox exclude list
+
+          EOF
+
+          chmod +x /usr/bin/systemctl_dropbox_exclusions.sh
+
+          # create systemd timer
+          cat <<EOF > /etc/systemd/system/subsonic-dropbox-exclusions.timer
+
+          [Unit]
+          Description=Runs subsonic dropbox-exclusions fixer every xx
+
+          [Timer]
+          # Time to wait after booting before we run first time
+          OnBootSec=1min
+          # Time between running each consecutive time
+          OnUnitActiveSec=1min
+          Unit=subsonic-dropbox-exclusions.service
+          EOF
+
+          # create systemd service
+          cat <<EOF > /etc/systemd/system/subsonic-dropbox-exclusions.service
+
+          [Unit]
+          Description=Subsonic dropbox-exclusions
+
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/bash /usr/bin/systemctl_dropbox_exclusions.sh
+          User=jumpbox
+          EOF
+
+          systemctl daemon-reload
+          systemctl start subsonic-dropbox-exclusions.timer
