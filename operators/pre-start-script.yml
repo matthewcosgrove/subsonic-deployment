@@ -39,7 +39,7 @@
             echo "dropbox start && dropbox lansync n"
             dropbox status && ~/.dropbox-dist/dropboxd
           EOF
-          # TODO: find some way to systemctl start dropbox after login
+          # TODO: find some way to systemctl start dropbox-keep-alive after login
           chmod +x $dropbox_up_script
           chown jumpbox:jumpbox $dropbox_up_script
           # alias for dropbox cli
@@ -49,9 +49,9 @@
           chmod +x $dropbox_cli
 
           # https://linoxide.com/linux-how-to/install-dropbox-ubuntu/
-          cat <<EOF >/etc/systemd/system/dropbox.service
+          cat <<EOF >/etc/systemd/system/dropbox-keep-alive.service
           [Unit]
-          Description=Dropbox Service
+          Description=Dropbox Keep Alive Service
           After=network.target
 
           [Service]
@@ -71,7 +71,7 @@
           EOF
 
           systemctl daemon-reload
-          systemctl enable dropbox
+          systemctl enable dropbox-keep-alive
 
           # https://www.linuxbabe.com/ubuntu/install-subsonic-media-server-ubuntu-18-04-https
           apt -yqq install openjdk-8-jre
