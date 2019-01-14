@@ -12,7 +12,7 @@ set -eu
 : "${SUBSONIC_LETS_ENCRYPT_EMAIL:? SUBSONIC_LETS_ENCRYPT_EMAIL must be set to an email given to certbot of Lets Encrypt }"
 
 set +u
-[ ! -z "$1" ] && STATE_DIR=state-$1
+[ ! -z "$1" ] && STATE_DIR=state-$1 && echo "IMPORTANT: Arg detected ---> $1"
 set -u
 REPO_ROOT_DIR="$(dirname $(dirname $( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )))"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
@@ -32,6 +32,7 @@ if [ -f $SCRIPT_DIR_STATE_DERIVED_CONFIG ];then
   source $SCRIPT_DIR_STATE_DERIVED_CONFIG
   subnet_gw=$AWS_SUBNET_GW
   subnet_new_ip=$AWS_SUBNET_VM_INTERNAL_IP
+  echo "Derived config already exists: $SCRIPT_DIR_STATE_DERIVED_CONFIG"
 else
   set +u
   [ ! -z "$1" ] && AWS_PRIVATE_IP_FOURTH_OCTET=${AWS_PRIVATE_IP_FOURTH_OCTET:-11}
@@ -40,6 +41,12 @@ else
   echo "VM's Private IP 4th octet will be $AWS_PRIVATE_IP_FOURTH_OCTET, to change it you can pass it in e.g. AWS_PRIVATE_IP_FOURTH_OCTET=12 $0"
   subnet_gw=$(awk -F"." '{print $1"."$2"."$3".1"}'<<<$subnet_cidr)
   subnet_new_ip=$(awk -F"." '{print $1"."$2"."$3"."}'<<<$subnet_cidr)$AWS_PRIVATE_IP_FOURTH_OCTET
+  cat <<EOF >$SCRIPT_DIR_STATE_DERIVED_CONFIG
+  AWS_SUBNET_GW=$subnet_gw
+  AWS_SUBNET_VM_INTERNAL_IP=$subnet_new_ip
+EOF
+  echo "Derived config written to $SCRIPT_DIR_STATE_DERIVED_CONFIG"
+  cat $SCRIPT_DIR_STATE_DERIVED_CONFIG
 fi
 echo "VM will be created with private IP $subnet_new_ip and public IP $elastic_ip"
 jumpbox_home="/var/vcap/store/home/jumpbox"
@@ -88,16 +95,7 @@ bosh create-env $REPO_ROOT_DIR/src/jumpbox-deployment/jumpbox.yml \
   -v subsonic_domain=$SUBSONIC_DOMAIN \
   -v jumpbox_home=$jumpbox_home \
   -v subsonic_lets_encrypt_email=$SUBSONIC_LETS_ENCRYPT_EMAIL \
+  -v subsonic_solo_dropbox_folder=$SUBSONIC_SOLO_DROPBOX_FOLDER \
   -l ${TMPDIR}/subsonic-args.yml \
   --var-file private_key=$AWS_PRIVATE_KEY_LOCATION
-if [ ! -f $SCRIPT_DIR_STATE_DERIVED_CONFIG ];then
-cat <<EOF >$SCRIPT_DIR_STATE_DERIVED_CONFIG
-AWS_SUBNET_GW=$subnet_gw
-AWS_SUBNET_VM_INTERNAL_IP=$subnet_new_ip
-EOF
-  echo "Derived config written to $SCRIPT_DIR_STATE_DERIVED_CONFIG"
-  cat $SCRIPT_DIR_STATE_DERIVED_CONFIG
-else
-  echo "Derived config already exists: $SCRIPT_DIR_STATE_DERIVED_CONFIG"
-fi
 popd > /dev/null
