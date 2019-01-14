@@ -39,6 +39,7 @@
             echo "dropbox start && dropbox lansync n"
             dropbox status && ~/.dropbox-dist/dropboxd
           EOF
+          # TODO: find some way to systemctl start dropbox after login
           chmod +x $dropbox_up_script
           chown jumpbox:jumpbox $dropbox_up_script
           # alias for dropbox cli
