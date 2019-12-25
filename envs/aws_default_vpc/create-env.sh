@@ -27,6 +27,15 @@ terraform init
 terraform apply -input=false -auto-approve -state=$TERRAFORM_STATE
 
 source $SCRIPT_DIR/output-terraform
+
+echo "Checking DNS resolves correctly (otherwise certbot will fail for Lets Encrypt)"
+dns_configured_ip=$(dig +short $SUBSONIC_DOMAIN)
+if [ "$dns_configured_ip" != "$elastic_ip" ]; then
+  echo "Doh! IP mismatch. Please check your DNS records for $SUBSONIC_DOMAIN"
+  echo "Expected: $elastic_ip. Actual: $dns_configured_ip"
+  exit 1
+fi
+
 SCRIPT_DIR_STATE_DERIVED_CONFIG="$SCRIPT_DIR_STATE/derived-config"
 if [ -f $SCRIPT_DIR_STATE_DERIVED_CONFIG ];then
   source $SCRIPT_DIR_STATE_DERIVED_CONFIG
