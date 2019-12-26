@@ -4,4 +4,4 @@
 
 - type: replace
   path: /instance_groups/name=jumpbox/persistent_disk?
-  value: 10240
+  value: 16384
