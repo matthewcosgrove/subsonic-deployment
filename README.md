@@ -61,15 +61,81 @@ envs/aws_default_vpc/jumpbox-ssh.sh
 
 You should now be in the ~ dir of the jumpbox which is actually /var/vcap/store/home/jumpbox. NOTE: Run `ssh-keygen -R <elastic-ip>` after any VM destroys to clean up the known_hosts file.
 
-Next we will need to get dropbox set up and authenticate. Follow the output carefully from the following script in the jumpbox home directory
-
-IMPORTANT: The dropbox-cli is a bit naff and there is no simple way to avoid Dropbox trying to sync everything on start up. Double check the exclusions are set up as expected to avoid any nonsense.
+Next we will need to get dropbox set up and authenticate your account. From the command line, type `run` and expect similar output to the following
 
 ```plain
-./ubuntu_dropbox_up.sh
+subsonic/0:~$ run
+Unable to find image 'otherguy/dropbox:latest' locally
+latest: Pulling from otherguy/dropbox
+16ea0e8c8879: Pull complete 
+50a842f747d4: Pull complete 
+de2417b2ab44: Pull complete 
+54e2490986d5: Pull complete 
+09a3f2dcc80a: Pull complete 
+f8ca7dd60c55: Pull complete 
+2f96670660f6: Pull complete 
+ecb96f0ba374: Pull complete 
+Digest: sha256:57d84d8a4e386d89f06f925b58616f014d30ff80ceb468d1188c48e8f6195e63
+Status: Downloaded newer image for otherguy/dropbox:latest
+b2e64186e5cce1af42b11c4769cb31d4d85ef77b5f0f418b459deb9a372302ad
 ```
 
-Again, read the output carefully, to ensure all the exclusions are in place.
+then type `logs` with similar output to the following
+
+```plain
+subsonic/0:~$ logs
+Checking for latest Dropbox version...
+Latest   : 87.4.138
+Installed: 86.4.146
+Downloading Dropbox 87.4.138...
+######################################################################## 100.0%
+Installing new version...
+Dropbox updated to v87.4.138
+
+Starting dropboxd (87.4.138)...
+dropbox: locating interpreter
+!! dropbox: failed to create log file (Permission denied)!
+dropbox: initializing
+dropbox: initializing python 3.7.5
+dropbox: setting program path '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/dropbox'
+dropbox: setting python path '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138:/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/python-packages.zip'
+dropbox: python initialized
+dropbox: running dropbox
+dropbox: setting args
+dropbox: applying overrides
+dropbox: running main script
+dropbox: load fq extension '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/cryptography.hazmat.bindings._constant_time.cpython-37m-x86_64-linux-gnu.so'
+dropbox: load fq extension '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/cryptography.hazmat.bindings._openssl.cpython-37m-x86_64-linux-gnu.so'
+dropbox: load fq extension '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/cryptography.hazmat.bindings._padding.cpython-37m-x86_64-linux-gnu.so'
+dropbox: load fq extension '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/psutil._psutil_linux.cpython-37m-x86_64-linux-gnu.so'
+dropbox: load fq extension '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/psutil._psutil_posix.cpython-37m-x86_64-linux-gnu.so'
+dropbox: load fq extension '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/linuxffi.pthread._linuxffi_pthread.cpython-37m-x86_64-linux-gnu.so'
+dropbox: load fq extension '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/cpuid.compiled._cpuid.cpython-37m-x86_64-linux-gnu.so'
+dropbox: load fq extension '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/apex._apex.cpython-37m-x86_64-linux-gnu.so'
+dropbox: load fq extension '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/tornado.speedups.cpython-37m-x86_64-linux-gnu.so'
+dropbox: load fq extension '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/linuxffi.resolv.compiled._linuxffi_resolv.cpython-37m-x86_64-linux-gnu.so'
+dropbox: load fq extension '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/librsyncffi.compiled._librsyncffi.cpython-37m-x86_64-linux-gnu.so'
+dropbox: load fq extension '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/linuxffi.sys.compiled._linuxffi_sys.cpython-37m-x86_64-linux-gnu.so'
+dropbox: load fq extension '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/posixffi.libc._posixffi_libc.cpython-37m-x86_64-linux-gnu.so'
+dropbox: load fq extension '/opt/dropbox/bin/dropbox-lnx.x86_64-87.4.138/linuxffi.gnu.compiled._linuxffi_gnu.cpython-37m-x86_64-linux-gnu.so'
+This computer isn't linked to any Dropbox account...
+Please visit https://www.dropbox.com/cli_link_nonce?nonce=85bd220cd31497f0d9a1b591e2e9e649 to link this device.
+This computer isn't linked to any Dropbox account...
+Please visit https://www.dropbox.com/cli_link_nonce?nonce=85bd220cd31497f0d9a1b591e2e9e649 to link this device.
+```
+
+follow the link to authenticate and then `ctrl-c` to continue. Dropbox files should now be syncing in the background.
+
+
+IMPORTANT: The dropbox-cli is a bit naff and there is no simple way to avoid Dropbox trying to sync everything on start up. The VM is configured with a systemd timer that ensures exclusions are put in place so that only the music folder is synced.
+
+The dropbox-cli is tucked away in a docker container for it's own safety, and the `dropbox` command is exposed for normal usage. Double check the exclusions are set up as expected to avoid any nonsense.
+
+```plain
+sudo systemctl status subsonic-dropbox-exclusions
+dropbox status
+```
+But that's it, everything should just work now! Logon to your subsonic server and configure it how you want.
 
 ### Updates
 

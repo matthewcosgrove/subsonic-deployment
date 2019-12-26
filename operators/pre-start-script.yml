@@ -19,59 +19,72 @@
           : "${SUBSONIC_SERVER_DOMAIN:? SUBSONIC_SERVER_DOMAIN must be set to the DNS being used to refer to this instance which should be configured in nginx e.g. music.mydomain.com }"
           : "${SUBSONIC_JVM_START_UP_ARGS:? SUBSONIC_JVM_START_UP_ARGS must be set to override the defaults in /etc/default/subsonic}"
           : "${SUBSONIC_SOLO_DROPBOX_FOLDER:? SUBSONIC_SOLO_DROPBOX_FOLDER must be set to the only folder which wont get excluded}"
+
+          echo "Started" > /tmp/progress.txt
           apt-get -qq update
-          apt -yqq install python
-          dropbox_cli=/usr/local/bin/dropbox.py
-          pushd $UBUNTU_USER_HOME_DIR
-          # install dropboxd
-          wget -O - "https://www.dropbox.com/download?plat=lnx.x86_64" | tar xzf -
-          chown -R jumpbox:jumpbox .dropbox-dist
-          # prepare dropbox start up script needed for interactive login
-          dropbox_up_script=ubuntu_dropbox_up.sh
-          cat <<EOF > $dropbox_up_script
-            #!/bin/bash
-            dropbox(){
-             /usr/local/bin/dropbox.py "\$@"
+          apt -yqq install apt-transport-https ca-certificates curl gnupg-agent software-properties-common
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+          add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+          apt-get -qq update
+          apt -yqq install docker-ce
+          echo "Docker installed" >> /tmp/progress.txt
+
+          cat << 'EOF' > $UBUNTU_USER_HOME_DIR/.bash_aliases
+          alias dropbox="docker exec -it dropbox gosu dropbox dropbox"
+          alias run="docker run --detach --name=dropbox --restart=always -e DROPBOX_UID=$(id -u) -e DROPBOX_GID=$(id -g) -v "/var/vcap/store/home/jumpbox/.dropbox:/opt/dropbox/.dropbox" -v "/var/vcap/store/home/jumpbox/Dropbox:/opt/dropbox/Dropbox" otherguy/dropbox:latest"
+          alias logs="docker logs --follow dropbox"
+          EOF
+          echo "Bash aliases configured" >> /tmp/progress.txt
+          
+          cat << EOF > $UBUNTU_USER_HOME_DIR/.env
+          export DROPBOX_FOLDER_TO_KEEP=$SUBSONIC_SOLO_DROPBOX_FOLDER
+          EOF
+          echo "Bash exports configured" >> /tmp/progress.txt
+
+          cat << 'EOF' > $UBUNTU_USER_HOME_DIR/.functions
+          function exclusion(){
+            pushd ~/Dropbox > /dev/null;
+            shopt -s nullglob; array=(*/); shopt -u nullglob; # https://stackoverflow.com/a/18887210
+            popd > /dev/null
+            if (( ${#array[@]} == 0 )); then
+              echo "No subdirectories found. Something went wrong so check the dropbox sync!" >&2
+              return 1
+            fi
+            source ~/.env
+            echo "Keeping only sub-directory $DROPBOX_FOLDER_TO_KEEP"
+            delete=($DROPBOX_FOLDER_TO_KEEP/)
+            for target in "${delete[@]}"; do
+              for i in "${!array[@]}"; do
+                if [[ ${array[i]} = $target ]]; then
+                  unset 'array[i]'
+                fi
+              done
+            done
+            dropbox_cmd="docker exec -i dropbox gosu dropbox dropbox"
+            if (( ${#array[@]} != 0 )); then
+              echo "Sub-directories to be excluded: $array"
+              $dropbox_cmd exclude add "${array[@]}"
+            else
+              echo "No further directories need excluding"
+            fi
+            $dropbox_cmd exclude
+          }
+          EOF
+          echo "Bash functions configured" >> /tmp/progress.txt
+
+          usermod -aG docker jumpbox
+
+          systemctl stop docker
+          mkdir -p /var/vcap/store/docker
+          cat <<EOF > /etc/docker/daemon.json
+            {
+               "graph": "/var/vcap/store/docker"
             }
-            echo "IMPORTANT: You must now login.. then kill the script and continue as described here"
-            echo "WARNING: Starting dropbox in the next step will start downloading everything from your account, so ensure the service is running to selective sync i.e. systemctl status subsonic-dropbox-exclusions"
-            echo "After login start dropbox with the following command"
-            echo "dropbox start && dropbox lansync n"
-            dropbox status && ~/.dropbox-dist/dropboxd
-          EOF
-          # TODO: find some way to systemctl start dropbox-keep-alive after login
-          chmod +x $dropbox_up_script
-          chown jumpbox:jumpbox $dropbox_up_script
-          # alias for dropbox cli
-          echo "alias dropbox=$dropbox_cli" > .bash_aliases
-          popd
-          [ ! -f $dropbox_cli ] && wget -O $dropbox_cli "https://www.dropbox.com/download?dl=packages/dropbox.py"
-          chmod +x $dropbox_cli
-
-          # https://linoxide.com/linux-how-to/install-dropbox-ubuntu/
-          cat <<EOF >/etc/systemd/system/dropbox-keep-alive.service
-          [Unit]
-          Description=Dropbox Keep Alive Service
-          After=network.target
-
-          [Service]
-          ExecStart=/bin/sh -c '/usr/local/bin/dropbox.py start'
-          ExecStop=/bin/sh -c '/usr/local/bin/dropbox.py stop'
-          PIDFile=${UBUNTU_USER_HOME_DIR}/.dropbox/dropbox.pid
-          User=jumpbox
-          Group=jumpbox
-          Type=forking
-          Restart=on-failure
-          RestartSec=5
-          StartLimitInterval=60s
-          StartLimitBurst=3
-
-          [Install]
-          WantedBy=multi-user.target
           EOF
 
-          systemctl daemon-reload
-          systemctl enable dropbox-keep-alive
+          systemctl start docker
+
+          echo "Docker configured" >> /tmp/progress.txt
 
           # https://www.linuxbabe.com/ubuntu/install-subsonic-media-server-ubuntu-18-04-https
           apt -yqq install openjdk-8-jre
@@ -84,6 +97,7 @@
           # as values contain / use different sed delimeter #
           sed -i '/^SUBSONIC_ARGS/ s#=.*$#="'"$subsonic_jvm_start_up_args_with_ampersand_escaped_for_sed"'"#' /etc/default/subsonic
           systemctl restart subsonic
+          echo "Subsonic installed" >> /tmp/progress.txt
 
           # Either enable IPv6 or change the nginx configuration issue --> https://serverfault.com/a/828014
           # Means we know the nginx install will fail so install and swallow failure
@@ -98,6 +112,7 @@
           systemctl daemon-reload
           systemctl restart nginx
           # check with 'netstat -plunt | grep nginx'
+          echo "Nginx installed" >> /tmp/progress.txt
 
           # 'EOF' vs EOF with escaping --> https://stackoverflow.com/a/25903579/752167 and https://unix.stackexchange.com/a/405254/308152
           cat <<EOF >/etc/nginx/conf.d/subsonic-proxy.conf
@@ -115,48 +130,30 @@
           }
           EOF
           systemctl reload nginx
+          echo "Nginx configured" >> /tmp/progress.txt
+
           apt install -yqq software-properties-common
           add-apt-repository -y ppa:certbot/certbot
           apt update
           apt install -yqq certbot python3-certbot-nginx
+          # IMPORTANT: Below may be commented out due to rate limiting. TODO: Switch to staging to testing purposes
           certbot -n --nginx --agree-tos --redirect --hsts --staple-ocsp --email $SUBSONIC_LETS_ENCRYPT_EMAIL --domain $SUBSONIC_SERVER_DOMAIN
-          # TODO: Run this as Timer Service so that it gets updated on every renew as well.. the certbot writes to this file, so should test if would get overwritten first
+          echo "Lets Encrypt configured via certbot" >> /tmp/progress.txt
+
           # Ensure that the settings page works etc. Full insight here https://sourceforge.net/p/subsonic/bugs/179/
           sed -i '/proxy_set_header X-Forwarded-Proto/ a '"proxy_redirect http:// https://;"'' /etc/nginx/conf.d/subsonic-proxy.conf
           systemctl reload nginx
 
           # dropbox exclusions service
-          DROPBOX_FOLDER_TO_KEEP=$SUBSONIC_SOLO_DROPBOX_FOLDER
-          dropbox_location=$UBUNTU_USER_HOME_DIR/Dropbox
           cat <<EOF > /usr/bin/systemctl_dropbox_exclusions.sh
           #!/bin/bash
-          [[ ! -d "$dropbox_location" ]] && { echo "FATAL - $dropbox_location does not exist"; exit 1; }
-
-          pushd $dropbox_location > /dev/null
-          # TODO: avoid ls ---> http://mywiki.wooledge.org/ParsingLs
-          dropbox(){
-           /usr/local/bin/dropbox.py "\$@"
-          }
-          while [ "\$(ls -1 | grep -v $DROPBOX_FOLDER_TO_KEEP | wc -l)" -ne "0" ]
-          do
-          item=\$(ls | grep -v "$DROPBOX_FOLDER_TO_KEEP" | head -1)
-          echo Excluding \$item
-          dropbox exclude add "\$item"
-          echo "'dropbox exclude add' completed for \$item"
-          done
-          popd > /dev/null
-          dropbox exclude list
-
+          source ~/.functions; exclusion
           EOF
-
           chmod +x /usr/bin/systemctl_dropbox_exclusions.sh
-
           # create systemd timer
           cat <<EOF > /etc/systemd/system/subsonic-dropbox-exclusions.timer
-
           [Unit]
           Description=Runs subsonic dropbox-exclusions fixer every xx
-
           [Timer]
           # Time to wait after booting before we run first time
           OnBootSec=1min
@@ -164,18 +161,14 @@
           OnUnitActiveSec=1min
           Unit=subsonic-dropbox-exclusions.service
           EOF
-
           # create systemd service
           cat <<EOF > /etc/systemd/system/subsonic-dropbox-exclusions.service
-
           [Unit]
           Description=Subsonic dropbox-exclusions
-
           [Service]
           Type=oneshot
           ExecStart=/bin/bash /usr/bin/systemctl_dropbox_exclusions.sh
           User=jumpbox
           EOF
-
           systemctl daemon-reload
           systemctl start subsonic-dropbox-exclusions.timer
