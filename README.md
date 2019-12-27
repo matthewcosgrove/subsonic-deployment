@@ -28,6 +28,10 @@ You should know how to set up env vars, and ensure all the env vars mentioned in
 
 State files created from `terraform` and `bosh` are kept in a state directory which is listed in `.gitignore` as they contain sensitive info as well as state that you should store safely. You are on your own with that aspect.
 
+## Overview of Solution
+
+![Overview of Solution image](Subsonic_on_AWS.png?raw=true "Overview of Solution")
+
 ## Create the Subsonic VM
 
 Scripts are provided. By default, at the time of writing (you should check the config files in this repo for the source of truth on this), the create-env.sh script will set up among other more minor things
