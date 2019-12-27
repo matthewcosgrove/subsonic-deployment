@@ -136,12 +136,11 @@
           add-apt-repository -y ppa:certbot/certbot
           apt update
           apt install -yqq certbot python3-certbot-nginx
-          # IMPORTANT: Below may be commented out due to rate limiting. TODO: Switch to staging to testing purposes
           certbot -n --nginx --agree-tos --redirect --hsts --staple-ocsp --email $SUBSONIC_LETS_ENCRYPT_EMAIL --domain $SUBSONIC_SERVER_DOMAIN
           echo "Lets Encrypt configured via certbot" >> /tmp/progress.txt
 
           # Ensure that the settings page works etc. Full insight here https://sourceforge.net/p/subsonic/bugs/179/
-          sed -i '/proxy_set_header X-Forwarded-Proto/ a '"proxy_redirect http:// https://;"'' /etc/nginx/conf.d/subsonic-proxy.conf
+          sed -i '/proxy_set_header X-Forwarded-Proto/ a '"                proxy_redirect http:// https://;"'' /etc/nginx/conf.d/subsonic-proxy.conf
           systemctl reload nginx
 
           # dropbox exclusions service
