@@ -87,6 +87,7 @@ bosh create-env $REPO_ROOT_DIR/src/jumpbox-deployment/jumpbox.yml \
   -o $REPO_ROOT_DIR/src/jumpbox-deployment/aws/cpi.yml \
   -o $REPO_ROOT_DIR/operators/pre-start-script.yml \
   -o $REPO_ROOT_DIR/operators/persistent-homes.yml \
+  -o $REPO_ROOT_DIR/operators/persistent-disk-sizing.yml \
   -o $REPO_ROOT_DIR/operators/override-aws-cpi-disk-for-data.yml \
   -o $REPO_ROOT_DIR/operators/replace-name-jumpbox-with-subsonic.yml \
   --vars-store $SCRIPT_DIR_STATE/creds.yml \
