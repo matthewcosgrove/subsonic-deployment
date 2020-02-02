@@ -162,10 +162,26 @@ envs/aws_default_vpc/destroy-env.sh
 
 If you don't want the default in-memory DB then Postgres can be configured as follows
 
-* Login to the AWS console for RDS and create a new DB named "subsonic" (use Dev/Test option to keep it in the free tier and then also select any checkboxes that say "Only enable options eligible for RDS Free Usage Tier")), take note of the host from the Connectivity tab Endpoint field (it should end in rds.amazonaws.com).
-* You should use the Default subnet. Hopefully, this should correspond to the Default VPC the scripts have used.
-* You wont need to set "Public accessibility" to Yes unless you want to manage the DB directly from your machine which would need external access.
-* Grab the VPC default security group id and add it to the newly created DB security group on the inbound rules for port 5432
+WARNING: this is the process at time of writing Jan 2020 - UI may have changed since then
+
+* Login to the AWS console for RDS
+* Select Standard Create
+* Select Postgres
+* Select Free Tier in Templates
+* Type "subsonic" in DB instance identifier under Settings
+* Populate preferred master creds and note them down
+* Use Default VPC
+* Open Additional Connectivity configuration
+* Use Default Subnet Group
+* To manage the DB from your current location choose "Yes" for Publically Accessbile (this will whitelist your current IP)
+* Select "Create New" for VPC security group and give it a name (You will need to configure the Inbound rules for this in a later step)
+* IMPORTANT: Open Additional Configuration and in Database Options find Initial Database name and populate it with "subsonic"
+
+Configure Security Group
+* Grab the VPC default security group id and add it to the newly created DB security group as an additional rule on the inbound rules for port 5432
+
+Take notes of config
+* Take note of the host from the Connectivity tab Endpoint field (it should end in rds.amazonaws.com)
 * Populate the env vars SUBSONIC_POSTGRES_DB_HOST, SUBSONIC_POSTGRES_DB_USERNAME and SUBSONIC_POSTGRES_DB_PASSWORD before running ./create-env.sh (these will be used to derive the JDBC driver url `jdbc:postgresql://$SUBSONIC_POSTGRES_DB_HOST:5432/subsonic?user=$SUBSONIC_POSTGRES_DB_USERNAME&password=$SUBSONIC_POSTGRES_DB_PASSWORD`)
 
 ### Appendix - Install Tools
